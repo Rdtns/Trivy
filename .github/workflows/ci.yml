@@ -1,0 +1,46 @@
+name: Docker Build and Trivy Scan
+
+on:
+  push:
+    branches:
+      - main  # Branche principale, modifiez si nécessaire
+  pull_request:
+    branches:
+      - main  # Branche principale, modifiez si nécessaire
+
+jobs:
+  trivy_scan:
+    runs-on: ubuntu-latest  # Utilisation d'un environnement Ubuntu pour le job
+
+    steps:
+      # Étape 1 : Récupérer le code source
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Étape 2 : Installer Docker
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      # Étape 3 : Construire l'image Docker
+      - name: Build Docker image
+        run: |
+          docker build -t monimage .
+
+      # Étape 4 : Installer Trivy
+      - name: Install Trivy
+        run: |
+          curl -sfL https://github.com/aquasecurity/trivy/releases/download/v0.22.0/trivy_0.22.0_Linux-x86_64.tar.gz -o trivy.tar.gz
+          tar zxvf trivy.tar.gz
+          sudo mv trivy /usr/local/bin/
+
+      # Étape 5 : Scanner l'image Docker avec Trivy
+      - name: Scan Docker image with Trivy
+        run: |
+          trivy image --severity CRITICAL monimage || echo "Vulnerabilities found with critical severity" && exit 1
+
+      # Étape 6 : Bloquer le build si des vulnérabilités critiques sont détectées
+      - name: Fail if critical vulnerabilities found
+        if: failure()  # Cette étape échouera si l'étape de scan échoue
+        run: |
+          echo "Critical vulnerabilities found in Docker image. Failing the build."
+          exit 1
